@@ -1,0 +1,1476 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>智能记账本</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        :root {
+            --primary-color: #4a6fa5;
+            --secondary-color: #166088;
+            --background-color: #f8f9fa;
+            --surface-color: #ffffff;
+            --text-color: #333333;
+            --border-color: #dddddd;
+            --success-color: #28a745;
+            --danger-color: #dc3545;
+        }
+        
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+        
+        body {
+            font-family: 'Helvetica Neue', Arial, sans-serif;
+            line-height: 1.6;
+            color: var(--text-color);
+            background-color: var(--background-color);
+            padding: 0;
+            margin: 0;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 15px;
+        }
+        
+        header {
+            background-color: var(--primary-color);
+            color: white;
+            padding: 1rem;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+        
+        .app-title {
+            font-size: 1.5rem;
+            font-weight: bold;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .last-saved {
+            font-size: 0.8rem;
+            opacity: 0.9;
+            font-weight: normal;
+        }
+        
+        .balance-cards {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 15px;
+            margin: 20px 0;
+        }
+        
+        .card {
+            background-color: var(--surface-color);
+            border-radius: 8px;
+            padding: 15px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+            transition: transform 0.2s;
+        }
+        
+        .card:hover {
+            transform: translateY(-5px);
+        }
+        
+        .card-title {
+            font-size: 0.9rem;
+            color: #666;
+            margin-bottom: 10px;
+        }
+        
+        .card-value {
+            font-size: 1.5rem;
+            font-weight: bold;
+        }
+        
+        .positive {
+            color: var(--success-color);
+        }
+        
+        .negative {
+            color: var(--danger-color);
+        }
+        
+        .nav-tabs {
+            display: flex;
+            border-bottom: 1px solid var(--border-color);
+            margin-bottom: 20px;
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+        }
+        
+        .nav-tab {
+            padding: 10px 15px;
+            cursor: pointer;
+            white-space: nowrap;
+            user-select: none;
+        }
+        
+        .nav-tab.active {
+            border-bottom: 2px solid var(--primary-color);
+            color: var(--primary-color);
+            font-weight: bold;
+        }
+        
+        .tab-content {
+            display: none;
+        }
+        
+        .tab-content.active {
+            display: block;
+            animation: fadeIn 0.3s;
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+        
+        .form-group {
+            margin-bottom: 15px;
+        }
+        
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: 500;
+        }
+        
+        input, select, textarea {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            font-size: 1rem;
+            background-color: var(--surface-color);
+        }
+        
+        input:focus, select:focus, textarea:focus {
+            outline: none;
+            border-color: var(--primary-color);
+            box-shadow: 0 0 0 2px rgba(74, 111, 165, 0.2);
+        }
+        
+        button {
+            background-color: var(--primary-color);
+            color: white;
+            border: none;
+            padding: 12px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 1rem;
+            transition: background-color 0.2s;
+        }
+        
+        button:hover {
+            background-color: var(--secondary-color);
+        }
+        
+        button.secondary {
+            background-color: #6c757d;
+        }
+        
+        button.secondary:hover {
+            background-color: #5a6268;
+        }
+        
+        .transaction-list {
+            list-style: none;
+            margin-top: 15px;
+        }
+        
+        .transaction-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 15px;
+            border-bottom: 1px solid var(--border-color);
+            align-items: center;
+            transition: background-color 0.2s;
+        }
+        
+        .transaction-item:hover {
+            background-color: rgba(0,0,0,0.02);
+        }
+        
+        .transaction-info {
+            flex: 1;
+        }
+        
+        .transaction-date {
+            font-size: 0.85rem;
+            color: #666;
+        }
+        
+        .transaction-desc {
+            font-weight: 500;
+            margin: 5px 0;
+        }
+        
+        .transaction-category {
+            font-size: 0.85rem;
+            color: #666;
+            display: inline-block;
+            padding: 3px 8px;
+            background-color: #f0f0f0;
+            border-radius: 12px;
+        }
+        
+        .transaction-amount {
+            font-weight: bold;
+            font-size: 1.1rem;
+        }
+        
+        .income {
+            color: var(--success-color);
+        }
+        
+        .expense {
+            color: var(--danger-color);
+        }
+        
+        .chart-container {
+            position: relative;
+            height: 300px;
+            margin: 20px 0;
+        }
+        
+        .summary-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin: 20px 0;
+        }
+        
+        .summary-item {
+            background-color: var(--surface-color);
+            border-radius: 8px;
+            padding: 15px;
+            text-align: center;
+        }
+        
+        .summary-value {
+            font-size: 1.5rem;
+            font-weight: bold;
+            margin: 10px 0;
+        }
+        
+        .summary-label {
+            color: #666;
+            font-size: 0.9rem;
+        }
+        
+        .action-buttons {
+            display: flex;
+            gap: 10px;
+            margin: 20px 0;
+            flex-wrap: wrap;
+        }
+        
+        /* 响应式设计 */
+        @media (max-width: 768px) {
+            .container {
+                padding: 10px;
+            }
+            
+            .balance-cards {
+                grid-template-columns: 1fr;
+            }
+            
+            .card {
+                padding: 12px;
+            }
+            
+            .app-title {
+                font-size: 1.2rem;
+                flex-direction: column;
+                align-items: flex-start;
+            }
+            
+            .last-saved {
+                margin-top: 5px;
+                font-size: 0.7rem;
+            }
+            
+            .nav-tabs {
+                flex-wrap: nowrap;
+            }
+            
+            .transaction-item {
+                flex-direction: column;
+                align-items: flex-start;
+            }
+            
+            .transaction-amount {
+                margin-top: 10px;
+                align-self: flex-end;
+            }
+            
+            .action-buttons {
+                flex-direction: column;
+            }
+            
+            button {
+                width: 100%;
+            }
+        }
+        
+        /* 添加到主屏幕提示 */
+        .install-prompt {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background-color: #333;
+            color: white;
+            padding: 15px;
+            text-align: center;
+            display: none;
+            z-index: 1000;
+            box-shadow: 0 -2px 10px rgba(0,0,0,0.1);
+        }
+        
+        .install-prompt button {
+            margin: 0 5px;
+        }
+        
+        /* 加载动画 */
+        .loader {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid var(--primary-color);
+            border-radius: 50%;
+            width: 30px;
+            height: 30px;
+            animation: spin 1s linear infinite;
+            margin: 20px auto;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        .hidden {
+            display: none;
+        }
+        
+        /* 通知消息 */
+        .notification {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            padding: 15px;
+            border-radius: 4px;
+            background-color: var(--success-color);
+            color: white;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            z-index: 1000;
+            transform: translateX(100%);
+            transition: transform 0.3s;
+        }
+        
+        .notification.show {
+            transform: translateX(0);
+        }
+        
+        .notification.error {
+            background-color: var(--danger-color);
+        }
+        
+        /* 空状态 */
+        .empty-state {
+            text-align: center;
+            padding: 40px 20px;
+            color: #666;
+        }
+        
+        .empty-state i {
+            font-size: 3rem;
+            margin-bottom: 15px;
+            opacity: 0.3;
+        }
+        
+        /* 表单中的单选按钮组 */
+        .radio-group {
+            display: flex;
+            gap: 15px;
+            margin-top: 5px;
+        }
+        
+        .radio-group label {
+            display: flex;
+            align-items: center;
+            font-weight: normal;
+            cursor: pointer;
+        }
+        
+        .radio-group input[type="radio"] {
+            width: auto;
+            margin-right: 5px;
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <div class="container">
+            <div class="app-title">
+                <span>智能记账本</span>
+                <span class="last-saved" id="lastSaved"></span>
+            </div>
+        </div>
+    </header>
+    
+    <div class="install-prompt" id="installPrompt">
+        将记账本添加到主屏幕，方便随时使用
+        <button id="installButton">添加</button>
+        <button class="secondary" id="dismissButton">忽略</button>
+    </div>
+    
+    <div class="container">
+        <div class="balance-cards">
+            <div class="card">
+                <div class="card-title">明面账面余额</div>
+                <div class="card-value" id="surfaceBalance">0.00</div>
+            </div>
+            <div class="card">
+                <div class="card-title">实际账面余额</div>
+                <div class="card-value" id="actualBalance">0.00</div>
+            </div>
+            <div class="card">
+                <div class="card-title">存款余额</div>
+                <div class="card-value" id="depositBalance">0.00</div>
+            </div>
+        </div>
+        
+        <div class="nav-tabs">
+            <div class="nav-tab active" data-tab="dashboard">仪表盘</div>
+            <div class="nav-tab" data-tab="surface">明面账面</div>
+            <div class="nav-tab" data-tab="actual">实际账面</div>
+            <div class="nav-tab" data-tab="deposit">存款</div>
+            <div class="nav-tab" data-tab="add">添加记录</div>
+            <div class="nav-tab" data-tab="reports">报表分析</div>
+        </div>
+        
+        <div class="tab-content active" id="dashboardTab">
+            <h2>财务概览</h2>
+            
+            <div class="summary-grid">
+                <div class="summary-item">
+                    <div class="summary-label">明面总收入</div>
+                    <div class="summary-value positive" id="surfaceTotalIncome">0.00</div>
+                </div>
+                <div class="summary-item">
+                    <div class="summary-label">明面总支出</div>
+                    <div class="summary-value expense" id="surfaceTotalExpense">0.00</div>
+                </div>
+                <div class="summary-item">
+                    <div class="summary-label">实际总收入</div>
+                    <div class="summary-value positive" id="actualTotalIncome">0.00</div>
+                </div>
+                <div class="summary-item">
+                    <div class="summary-label">实际总支出</div>
+                    <div class="summary-value expense" id="actualTotalExpense">0.00</div>
+                </div>
+                <div class="summary-item">
+                    <div class="summary-label">存款总额</div>
+                    <div class="summary-value positive" id="totalDeposits">0.00</div>
+                </div>
+                <div class="summary-item">
+                    <div class="summary-label">取款总额</div>
+                    <div class="summary-value expense" id="totalWithdrawals">0.00</div>
+                </div>
+            </div>
+            
+            <div class="chart-container">
+                <canvas id="balanceChart"></canvas>
+            </div>
+            
+            <div class="action-buttons">
+                <button id="refreshData">刷新数据</button>
+                <button class="secondary" id="exportData">导出数据 (CSV)</button>
+                <button class="secondary" id="importData">导入数据</button>
+                <button class="secondary" id="clearData">清空数据</button>
+            </div>
+        </div>
+        
+        <div class="tab-content" id="surfaceTab">
+            <h2>明面交易记录</h2>
+            <div id="surfaceTransactions">
+                <div class="loader hidden" id="surfaceLoader"></div>
+                <ul class="transaction-list" id="surfaceTransactionList"></ul>
+                <div class="empty-state" id="surfaceEmpty">
+                    <div>暂无明面交易记录</div>
+                    <div>点击"添加记录"开始记账</div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="tab-content" id="actualTab">
+            <h2>实际交易记录</h2>
+            <div id="actualTransactions">
+                <div class="loader hidden" id="actualLoader"></div>
+                <ul class="transaction-list" id="actualTransactionList"></ul>
+                <div class="empty-state" id="actualEmpty">
+                    <div>暂无实际交易记录</div>
+                    <div>点击"添加记录"开始记账</div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="tab-content" id="depositTab">
+            <h2>存款交易记录</h2>
+            <div id="depositTransactions">
+                <div class="loader hidden" id="depositLoader"></div>
+                <ul class="transaction-list" id="depositTransactionList"></ul>
+                <div class="empty-state" id="depositEmpty">
+                    <div>暂无存款交易记录</div>
+                    <div>点击"添加记录"开始记账</div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="tab-content" id="addTab">
+            <h2>添加新记录</h2>
+            <form id="transactionForm">
+                <div class="form-group">
+                    <label for="recordType">记录类型</label>
+                    <select id="recordType" required>
+                        <option value="surface">明面账面</option>
+                        <option value="actual">实际账面</option>
+                        <option value="deposit">存款</option>
+                    </select>
+                </div>
+                
+                <div class="form-group">
+                    <label for="transactionDate">日期</label>
+                    <input type="date" id="transactionDate" required>
+                </div>
+                
+                <div class="form-group">
+                    <label for="description">描述</label>
+                    <input type="text" id="description" placeholder="交易描述" required>
+                </div>
+                
+                <div class="form-group" id="amountTypeGroup">
+                    <label>金额类型</label>
+                    <div class="radio-group">
+                        <label>
+                            <input type="radio" id="income" name="amountType" value="income" checked>
+                            收入
+                        </label>
+                        <label>
+                            <input type="radio" id="expense" name="amountType" value="expense">
+                            支出
+                        </label>
+                    </div>
+                </div>
+                
+                <div class="form-group">
+                    <label for="amount">金额</label>
+                    <input type="number" id="amount" step="0.01" placeholder="0.00" min="0.01" required>
+                </div>
+                
+                <div class="form-group" id="categoryGroup">
+                    <label for="category">类别</label>
+                    <select id="category">
+                        <option value="工资">工资</option>
+                        <option value="奖金">奖金</option>
+                        <option value="投资">投资</option>
+                        <option value="住房">住房</option>
+                        <option value="食品">食品</option>
+                        <option value="交通">交通</option>
+                        <option value="娱乐">娱乐</option>
+                        <option value="医疗">医疗</option>
+                        <option value="其他">其他</option>
+                    </select>
+                </div>
+                
+                <div class="form-group" id="depositTypeGroup" style="display: none;">
+                    <label for="depositType">存款类型</label>
+                    <select id="depositType">
+                        <option value="deposit">存入</option>
+                        <option value="withdrawal">取出</option>
+                    </select>
+                </div>
+                
+                <button type="submit" id="addTransaction">添加记录</button>
+            </form>
+        </div>
+        
+        <div class="tab-content" id="reportsTab">
+            <h2>财务报表分析</h2>
+            
+            <div class="card">
+                <h3>余额对比</h3>
+                <p>明面账面余额: <span id="reportSurfaceBalance">0.00</span></p>
+                <p>实际账面余额: <span id="reportActualBalance">0.00</span></p>
+                <p>存款余额: <span id="reportDepositBalance">0.00</span></p>
+                <p>明面与实际差异: <span id="surfaceActualDiff">0.00</span></p>
+                <p>实际与存款差异: <span id="actualDepositDiff">0.00</span></p>
+            </div>
+            
+            <div class="chart-container">
+                <canvas id="categoryChart"></canvas>
+            </div>
+            
+            <div class="chart-container">
+                <canvas id="incomeVsExpenseChart"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <div class="notification" id="notification"></div>
+
+    <input type="file" id="importFile" accept=".csv" style="display: none;">
+
+    <script>
+        // 数据库和状态管理
+        let db;
+        const DB_NAME = 'AccountingDB';
+        const DB_VERSION = 2;
+        let balanceChart, categoryChart, incomeVsExpenseChart;
+        
+        // 初始化数据库
+        function initDatabase() {
+            return new Promise((resolve, reject) => {
+                const request = indexedDB.open(DB_NAME, DB_VERSION);
+                
+                request.onerror = event => {
+                    console.error('数据库打开失败:', event.target.error);
+                    showNotification('数据库打开失败', true);
+                    reject(event.target.error);
+                };
+                
+                request.onsuccess = event => {
+                    db = event.target.result;
+                    console.log('数据库打开成功');
+                    resolve(db);
+                };
+                
+                request.onupgradeneeded = event => {
+                    const db = event.target.result;
+                    
+                    // 删除旧的对象存储（如果存在）
+                    if (db.objectStoreNames.contains('surface_ledger')) {
+                        db.deleteObjectStore('surface_ledger');
+                    }
+                    if (db.objectStoreNames.contains('actual_ledger')) {
+                        db.deleteObjectStore('actual_ledger');
+                    }
+                    if (db.objectStoreNames.contains('deposits')) {
+                        db.deleteObjectStore('deposits');
+                    }
+                    
+                    // 创建明面账面表
+                    const surfaceStore = db.createObjectStore('surface_ledger', { 
+                        keyPath: 'id', 
+                        autoIncrement: true 
+                    });
+                    surfaceStore.createIndex('date', 'date', { unique: false });
+                    surfaceStore.createIndex('category', 'category', { unique: false });
+                    
+                    // 创建实际账面表
+                    const actualStore = db.createObjectStore('actual_ledger', { 
+                        keyPath: 'id', 
+                        autoIncrement: true 
+                    });
+                    actualStore.createIndex('date', 'date', { unique: false });
+                    actualStore.createIndex('category', 'category', { unique: false });
+                    
+                    // 创建存款表
+                    const depositStore = db.createObjectStore('deposits', { 
+                        keyPath: 'id', 
+                        autoIncrement: true 
+                    });
+                    depositStore.createIndex('date', 'date', { unique: false });
+                    depositStore.createIndex('type', 'type', { unique: false });
+                    
+                    console.log('数据库初始化完成');
+                };
+            });
+        }
+        
+        // 添加交易记录
+        function addTransaction(storeName, transaction) {
+            return new Promise((resolve, reject) => {
+                const tx = db.transaction(storeName, 'readwrite');
+                const store = tx.objectStore(storeName);
+                const request = store.add(transaction);
+                
+                request.onsuccess = () => {
+                    console.log('交易记录添加成功');
+                    resolve(request.result);
+                };
+                
+                request.onerror = event => {
+                    console.error('交易记录添加失败:', event.target.error);
+                    showNotification('交易记录添加失败', true);
+                    reject(event.target.error);
+                };
+            });
+        }
+        
+        // 获取所有交易记录
+        function getAllTransactions(storeName) {
+            return new Promise((resolve, reject) => {
+                const tx = db.transaction(storeName, 'readonly');
+                const store = tx.objectStore(storeName);
+                const request = store.getAll();
+                
+                request.onsuccess = () => {
+                    resolve(request.result);
+                };
+                
+                request.onerror = event => {
+                    console.error('获取交易记录失败:', event.target.error);
+                    showNotification('获取交易记录失败', true);
+                    reject(event.target.error);
+                };
+            });
+        }
+        
+        // 删除所有数据
+        function clearAllData() {
+            return new Promise(async (resolve, reject) => {
+                try {
+                    const tx = db.transaction(['surface_ledger', 'actual_ledger', 'deposits'], 'readwrite');
+                    
+                    tx.objectStore('surface_ledger').clear();
+                    tx.objectStore('actual_ledger').clear();
+                    tx.objectStore('deposits').clear();
+                    
+                    tx.oncomplete = () => {
+                        console.log('所有数据已清除');
+                        resolve();
+                    };
+                    
+                    tx.onerror = event => {
+                        console.error('清除数据失败:', event.target.error);
+                        showNotification('清除数据失败', true);
+                        reject(event.target.error);
+                    };
+                } catch (error) {
+                    reject(error);
+                }
+            });
+        }
+        
+        // 计算余额
+        function calculateBalance(transactions, isDeposit = false) {
+            if (isDeposit) {
+                return transactions.reduce((total, transaction) => {
+                    return transaction.type === 'deposit' ? 
+                           total + transaction.amount : 
+                           total - transaction.amount;
+                }, 0);
+            } else {
+                return transactions.reduce((total, transaction) => {
+                    return total + (transaction.income || 0) - (transaction.expense || 0);
+                }, 0);
+            }
+        }
+        
+        // 计算总收入
+        function calculateTotalIncome(transactions) {
+            return transactions.reduce((total, transaction) => {
+                return total + (transaction.income || 0);
+            }, 0);
+        }
+        
+        // 计算总支出
+        function calculateTotalExpense(transactions) {
+            return transactions.reduce((total, transaction) => {
+                return total + (transaction.expense || 0);
+            }, 0);
+        }
+        
+        // 计算存款总额
+        function calculateTotalDeposits(transactions) {
+            return transactions.reduce((total, transaction) => {
+                return transaction.type === 'deposit' ? total + transaction.amount : total;
+            }, 0);
+        }
+        
+        // 计算取款总额
+        function calculateTotalWithdrawals(transactions) {
+            return transactions.reduce((total, transaction) => {
+                return transaction.type === 'withdrawal' ? total + transaction.amount : total;
+            }, 0);
+        }
+        
+        // 按类别汇总
+        function summarizeByCategory(transactions, type = 'income') {
+            const summary = {};
+            
+            transactions.forEach(transaction => {
+                const category = transaction.category || '其他';
+                const amount = type === 'income' ? 
+                    (transaction.income || 0) : 
+                    (transaction.expense || 0);
+                
+                if (amount > 0) {
+                    if (!summary[category]) {
+                        summary[category] = 0;
+                    }
+                    summary[category] += amount;
+                }
+            });
+            
+            return summary;
+        }
+        
+        // 显示通知
+        function showNotification(message, isError = false) {
+            const notification = document.getElementById('notification');
+            notification.textContent = message;
+            notification.className = 'notification' + (isError ? ' error' : '');
+            notification.classList.add('show');
+            
+            setTimeout(() => {
+                notification.classList.remove('show');
+            }, 3000);
+        }
+        
+        // 更新余额显示
+        async function updateBalances() {
+            try {
+                const surfaceTransactions = await getAllTransactions('surface_ledger');
+                const actualTransactions = await getAllTransactions('actual_ledger');
+                const depositTransactions = await getAllTransactions('deposits');
+                
+                const surfaceBalance = calculateBalance(surfaceTransactions);
+                const actualBalance = calculateBalance(actualTransactions);
+                const depositBalance = calculateBalance(depositTransactions, true);
+                
+                const surfaceTotalIncome = calculateTotalIncome(surfaceTransactions);
+                const surfaceTotalExpense = calculateTotalExpense(surfaceTransactions);
+                const actualTotalIncome = calculateTotalIncome(actualTransactions);
+                const actualTotalExpense = calculateTotalExpense(actualTransactions);
+                const totalDeposits = calculateTotalDeposits(depositTransactions);
+                const totalWithdrawals = calculateTotalWithdrawals(depositTransactions);
+                
+                // 更新余额显示
+                document.getElementById('surfaceBalance').textContent = surfaceBalance.toFixed(2);
+                document.getElementById('actualBalance').textContent = actualBalance.toFixed(2);
+                document.getElementById('depositBalance').textContent = depositBalance.toFixed(2);
+                
+                // 更新汇总显示
+                document.getElementById('surfaceTotalIncome').textContent = surfaceTotalIncome.toFixed(2);
+                document.getElementById('surfaceTotalExpense').textContent = surfaceTotalExpense.toFixed(2);
+                document.getElementById('actualTotalIncome').textContent = actualTotalIncome.toFixed(2);
+                document.getElementById('actualTotalExpense').textContent = actualTotalExpense.toFixed(2);
+                document.getElementById('totalDeposits').textContent = totalDeposits.toFixed(2);
+                document.getElementById('totalWithdrawals').textContent = totalWithdrawals.toFixed(2);
+                
+                // 更新报表中的余额
+                document.getElementById('reportSurfaceBalance').textContent = surfaceBalance.toFixed(2);
+                document.getElementById('reportActualBalance').textContent = actualBalance.toFixed(2);
+                document.getElementById('reportDepositBalance').textContent = depositBalance.toFixed(2);
+                document.getElementById('surfaceActualDiff').textContent = (surfaceBalance - actualBalance).toFixed(2);
+                document.getElementById('actualDepositDiff').textContent = (actualBalance - depositBalance).toFixed(2);
+                
+                // 设置颜色
+                document.getElementById('surfaceBalance').className = 'card-value ' + (surfaceBalance >= 0 ? 'positive' : 'negative');
+                document.getElementById('actualBalance').className = 'card-value ' + (actualBalance >= 0 ? 'positive' : 'negative');
+                document.getElementById('depositBalance').className = 'card-value ' + (depositBalance >= 0 ? 'positive' : 'negative');
+                
+                // 更新图表
+                updateCharts(surfaceTransactions, actualTransactions, depositTransactions);
+                
+                // 更新最后保存时间
+                document.getElementById('lastSaved').textContent = '最后更新: ' + new Date().toLocaleTimeString();
+                
+            } catch (error) {
+                console.error('更新余额失败:', error);
+                showNotification('更新数据失败', true);
+            }
+        }
+        
+        // 更新图表
+        function updateCharts(surfaceTransactions, actualTransactions, depositTransactions) {
+            // 余额对比图表
+            if (balanceChart) {
+                balanceChart.destroy();
+            }
+            
+            const balanceCtx = document.getElementById('balanceChart').getContext('2d');
+            balanceChart = new Chart(balanceCtx, {
+                type: 'bar',
+                data: {
+                    labels: ['明面账面', '实际账面', '存款'],
+                    datasets: [{
+                        label: '余额',
+                        data: [
+                            calculateBalance(surfaceTransactions),
+                            calculateBalance(actualTransactions),
+                            calculateBalance(depositTransactions, true)
+                        ],
+                        backgroundColor: [
+                            'rgba(74, 111, 165, 0.7)',
+                            'rgba(22, 96, 136, 0.7)',
+                            'rgba(40, 167, 69, 0.7)'
+                        ],
+                        borderColor: [
+                            'rgba(74, 111, 165, 1)',
+                            'rgba(22, 96, 136, 1)',
+                            'rgba(40, 167, 69, 1)'
+                        ],
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: {
+                            beginAtZero: true
+                        }
+                    }
+                }
+            });
+            
+            // 类别分析图表
+            if (categoryChart) {
+                categoryChart.destroy();
+            }
+            
+            const categoryCtx = document.getElementById('categoryChart').getContext('2d');
+            const surfaceIncomeByCategory = summarizeByCategory(surfaceTransactions, 'income');
+            const surfaceExpenseByCategory = summarizeByCategory(surfaceTransactions, 'expense');
+            const actualIncomeByCategory = summarizeByCategory(actualTransactions, 'income');
+            const actualExpenseByCategory = summarizeByCategory(actualTransactions, 'expense');
+            
+            // 合并所有类别
+            const allCategories = new Set([
+                ...Object.keys(surfaceIncomeByCategory),
+                ...Object.keys(surfaceExpenseByCategory),
+                ...Object.keys(actualIncomeByCategory),
+                ...Object.keys(actualExpenseByCategory)
+            ]);
+            
+            const surfaceIncomeData = [];
+            const surfaceExpenseData = [];
+            const actualIncomeData = [];
+            const actualExpenseData = [];
+            
+            allCategories.forEach(category => {
+                surfaceIncomeData.push(surfaceIncomeByCategory[category] || 0);
+                surfaceExpenseData.push(surfaceExpenseByCategory[category] || 0);
+                actualIncomeData.push(actualIncomeByCategory[category] || 0);
+                actualExpenseData.push(actualExpenseByCategory[category] || 0);
+            });
+            
+            categoryChart = new Chart(categoryCtx, {
+                type: 'bar',
+                data: {
+                    labels: Array.from(allCategories),
+                    datasets: [
+                        {
+                            label: '明面收入',
+                            data: surfaceIncomeData,
+                            backgroundColor: 'rgba(74, 111, 165, 0.7)'
+                        },
+                        {
+                            label: '明面支出',
+                            data: surfaceExpenseData,
+                            backgroundColor: 'rgba(220, 53, 69, 0.7)'
+                        },
+                        {
+                            label: '实际收入',
+                            data: actualIncomeData,
+                            backgroundColor: 'rgba(22, 96, 136, 0.7)'
+                        },
+                        {
+                            label: '实际支出',
+                            data: actualExpenseData,
+                            backgroundColor: 'rgba(253, 126, 20, 0.7)'
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        x: {
+                            stacked: true
+                        },
+                        y: {
+                            stacked: true,
+                            beginAtZero: true
+                        }
+                    }
+                }
+            });
+            
+            // 收入vs支出图表
+            if (incomeVsExpenseChart) {
+                incomeVsExpenseChart.destroy();
+            }
+            
+            const incomeVsExpenseCtx = document.getElementById('incomeVsExpenseChart').getContext('2d');
+            incomeVsExpenseChart = new Chart(incomeVsExpenseCtx, {
+                type: 'doughnut',
+                data: {
+                    labels: ['明面收入', '明面支出', '实际收入', '实际支出'],
+                    datasets: [{
+                        data: [
+                            calculateTotalIncome(surfaceTransactions),
+                            calculateTotalExpense(surfaceTransactions),
+                            calculateTotalIncome(actualTransactions),
+                            calculateTotalExpense(actualTransactions)
+                        ],
+                        backgroundColor: [
+                            'rgba(74, 111, 165, 0.7)',
+                            'rgba(220, 53, 69, 0.7)',
+                            'rgba(22, 96, 136, 0.7)',
+                            'rgba(253, 126, 20, 0.7)'
+                        ],
+                        borderColor: [
+                            'rgba(74, 111, 165, 1)',
+                            'rgba(220, 53, 69, 1)',
+                            'rgba(22, 96, 136, 1)',
+                            'rgba(253, 126, 20, 1)'
+                        ],
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false
+                }
+            });
+        }
+        
+        // 显示交易记录
+        async function displayTransactions(storeName, listElementId, loaderId, emptyElementId) {
+            try {
+                document.getElementById(loaderId).classList.remove('hidden');
+                document.getElementById(emptyElementId).classList.add('hidden');
+                
+                const transactions = await getAllTransactions(storeName);
+                const listElement = document.getElementById(listElementId);
+                
+                // 清空现有内容
+                listElement.innerHTML = '';
+                
+                // 按日期排序（最新的在前面）
+                transactions.sort((a, b) => new Date(b.date) - new Date(a.date));
+                
+                // 添加交易记录
+                transactions.forEach(transaction => {
+                    const li = document.createElement('li');
+                    li.className = 'transaction-item';
+                    
+                    const infoDiv = document.createElement('div');
+                    infoDiv.className = 'transaction-info';
+                    
+                    const dateSpan = document.createElement('div');
+                    dateSpan.className = 'transaction-date';
+                    dateSpan.textContent = transaction.date;
+                    
+                    const descSpan = document.createElement('div');
+                    descSpan.className = 'transaction-desc';
+                    descSpan.textContent = transaction.description;
+                    
+                    infoDiv.appendChild(dateSpan);
+                    infoDiv.appendChild(descSpan);
+                    
+                    if (transaction.category) {
+                        const categorySpan = document.createElement('span');
+                        categorySpan.className = 'transaction-category';
+                        categorySpan.textContent = transaction.category;
+                        infoDiv.appendChild(categorySpan);
+                    }
+                    
+                    const amountDiv = document.createElement('div');
+                    
+                    if (storeName === 'deposits') {
+                        amountDiv.className = 'transaction-amount ' + 
+                                            (transaction.type === 'deposit' ? 'income' : 'expense');
+                        amountDiv.textContent = (transaction.type === 'deposit' ? '+' : '-') + 
+                                                transaction.amount.toFixed(2);
+                    } else {
+                        if (transaction.income > 0) {
+                            amountDiv.className = 'transaction-amount income';
+                            amountDiv.textContent = '+' + transaction.income.toFixed(2);
+                        } else {
+                            amountDiv.className = 'transaction-amount expense';
+                            amountDiv.textContent = '-' + transaction.expense.toFixed(2);
+                        }
+                    }
+                    
+                    li.appendChild(infoDiv);
+                    li.appendChild(amountDiv);
+                    
+                    listElement.appendChild(li);
+                });
+                
+                document.getElementById(loaderId).classList.add('hidden');
+                
+                if (transactions.length === 0) {
+                    document.getElementById(emptyElementId).classList.remove('hidden');
+                }
+                
+            } catch (error) {
+                console.error('显示交易记录失败:', error);
+                document.getElementById(loaderId).classList.add('hidden');
+                showNotification('加载交易记录失败', true);
+            }
+        }
+        
+        // 导出数据为CSV
+        async function exportData() {
+            try {
+                const surfaceTransactions = await getAllTransactions('surface_ledger');
+                const actualTransactions = await getAllTransactions('actual_ledger');
+                const depositTransactions = await getAllTransactions('deposits');
+                
+                // 创建CSV内容
+                let csvContent = "data:text/csv;charset=utf-8,";
+                
+                // 明面账面数据
+                csvContent += "明面账面交易记录\r\n";
+                csvContent += "日期,描述,收入,支出,类别\r\n";
+                surfaceTransactions.forEach(transaction => {
+                    csvContent += `${transaction.date},${transaction.description},${transaction.income || 0},${transaction.expense || 0},${transaction.category || ''}\r\n`;
+                });
+                
+                csvContent += "\r\n实际账面交易记录\r\n";
+                csvContent += "日期,描述,收入,支出,类别\r\n";
+                actualTransactions.forEach(transaction => {
+                    csvContent += `${transaction.date},${transaction.description},${transaction.income || 0},${transaction.expense || 0},${transaction.category || ''}\r\n`;
+                });
+                
+                csvContent += "\r\n存款交易记录\r\n";
+                csvContent += "日期,描述,金额,类型\r\n";
+                depositTransactions.forEach(transaction => {
+                    csvContent += `${transaction.date},${transaction.description},${transaction.amount},${transaction.type}\r\n`;
+                });
+                
+                // 创建下载链接
+                const encodedUri = encodeURI(csvContent);
+                const link = document.createElement("a");
+                link.setAttribute("href", encodedUri);
+                link.setAttribute("download", `记账数据_${new Date().toISOString().split('T')[0]}.csv`);
+                document.body.appendChild(link);
+                
+                link.click();
+                document.body.removeChild(link);
+                
+                showNotification('数据导出成功');
+            } catch (error) {
+                console.error('导出数据失败:', error);
+                showNotification('导出数据失败', true);
+            }
+        }
+        
+        // 导入数据
+        function importData(file) {
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                
+                reader.onload = function(e) {
+                    try {
+                        const content = e.target.result;
+                        const lines = content.split('\n');
+                        let currentSection = '';
+                        let transactions = [];
+                        
+                        for (let i = 0; i < lines.length; i++) {
+                            const line = lines[i].trim();
+                            
+                            if (line === '明面账面交易记录') {
+                                currentSection = 'surface';
+                                continue;
+                            } else if (line === '实际账面交易记录') {
+                                currentSection = 'actual';
+                                continue;
+                            } else if (line === '存款交易记录') {
+                                currentSection = 'deposit';
+                                continue;
+                            } else if (line === '' || line.startsWith('日期,')) {
+                                continue;
+                            }
+                            
+                            if (currentSection && line) {
+                                const values = line.split(',');
+                                
+                                if (currentSection === 'surface' || currentSection === 'actual') {
+                                    if (values.length >= 5) {
+                                        transactions.push({
+                                            store: currentSection === 'surface' ? 'surface_ledger' : 'actual_ledger',
+                                            data: {
+                                                date: values[0],
+                                                description: values[1],
+                                                income: parseFloat(values[2]) || 0,
+                                                expense: parseFloat(values[3]) || 0,
+                                                category: values[4] || ''
+                                            }
+                                        });
+                                    }
+                                } else if (currentSection === 'deposit') {
+                                    if (values.length >= 4) {
+                                        transactions.push({
+                                            store: 'deposits',
+                                            data: {
+                                                date: values[0],
+                                                description: values[1],
+                                                amount: parseFloat(values[2]),
+                                                type: values[3]
+                                            }
+                                        });
+                                    }
+                                }
+                            }
+                        }
+                        
+                        resolve(transactions);
+                    } catch (error) {
+                        reject(error);
+                    }
+                };
+                
+                reader.onerror = function() {
+                    reject(new Error('文件读取失败'));
+                };
+                
+                reader.readAsText(file);
+            });
+        }
+        
+        // 初始化页面
+        async function initApp() {
+            try {
+                await initDatabase();
+                await updateBalances();
+                await displayTransactions('surface_ledger', 'surfaceTransactionList', 'surfaceLoader', 'surfaceEmpty');
+                await displayTransactions('actual_ledger', 'actualTransactionList', 'actualLoader', 'actualEmpty');
+                await displayTransactions('deposits', 'depositTransactionList', 'depositLoader', 'depositEmpty');
+                
+                // 设置当前日期为默认值
+                const today = new Date().toISOString().split('T')[0];
+                document.getElementById('transactionDate').value = today;
+                
+                console.log('应用初始化完成');
+                showNotification('应用初始化完成');
+            } catch (error) {
+                console.error('应用初始化失败:', error);
+                showNotification('应用初始化失败', true);
+            }
+        }
+        
+        // 事件监听器设置
+        function setupEventListeners() {
+            // 标签切换功能
+            document.querySelectorAll('.nav-tab').forEach(tab => {
+                tab.addEventListener('click', () => {
+                    // 移除所有active类
+                    document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
+                    document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+                    
+                    // 添加active类到当前标签
+                    tab.classList.add('active');
+                    const tabId = tab.getAttribute('data-tab') + 'Tab';
+                    document.getElementById(tabId).classList.add('active');
+                });
+            });
+            
+            // 记录类型切换
+            document.getElementById('recordType').addEventListener('change', function() {
+                const isDeposit = this.value === 'deposit';
+                
+                if (isDeposit) {
+                    document.getElementById('amountTypeGroup').style.display = 'none';
+                    document.getElementById('categoryGroup').style.display = 'none';
+                    document.getElementById('depositTypeGroup').style.display = 'block';
+                } else {
+                    document.getElementById('amountTypeGroup').style.display = 'block';
+                    document.getElementById('categoryGroup').style.display = 'block';
+                    document.getElementById('depositTypeGroup').style.display = 'none';
+                }
+            });
+            
+            // 表单提交
+            document.getElementById('transactionForm').addEventListener('submit', async function(e) {
+                e.preventDefault();
+                
+                const recordType = document.getElementById('recordType').value;
+                const date = document.getElementById('transactionDate').value;
+                const description = document.getElementById('description').value;
+                const amount = parseFloat(document.getElementById('amount').value);
+                
+                if (!date || !description || isNaN(amount) || amount <= 0) {
+                    showNotification('请填写完整且有效的交易信息', true);
+                    return;
+                }
+                
+                let transactionData;
+                let storeName;
+                
+                if (recordType === 'deposit') {
+                    const type = document.getElementById('depositType').value;
+                    storeName = 'deposits';
+                    transactionData = {
+                        date,
+                        description,
+                        amount,
+                        type
+                    };
+                } else {
+                    const amountType = document.querySelector('input[name="amountType"]:checked').value;
+                    const category = document.getElementById('category').value;
+                    storeName = recordType === 'surface' ? 'surface_ledger' : 'actual_ledger';
+                    
+                    transactionData = {
+                        date,
+                        description,
+                        income: amountType === 'income' ? amount : 0,
+                        expense: amountType === 'expense' ? amount : 0,
+                        category
+                    };
+                }
+                
+                try {
+                    await addTransaction(storeName, transactionData);
+                    showNotification('交易记录添加成功！');
+                    
+                    // 清空表单
+                    document.getElementById('description').value = '';
+                    document.getElementById('amount').value = '';
+                    
+                    // 更新显示
+                    await updateBalances();
+                    
+                    if (recordType === 'surface') {
+                        await displayTransactions('surface_ledger', 'surfaceTransactionList', 'surfaceLoader', 'surfaceEmpty');
+                    } else if (recordType === 'actual') {
+                        await displayTransactions('actual_ledger', 'actualTransactionList', 'actualLoader', 'actualEmpty');
+                    } else {
+                        await displayTransactions('deposits', 'depositTransactionList', 'depositLoader', 'depositEmpty');
+                    }
+                    
+                } catch (error) {
+                    console.error('添加交易记录失败:', error);
+                    showNotification('添加交易记录失败，请重试', true);
+                }
+            });
+            
+            // 刷新数据
+            document.getElementById('refreshData').addEventListener('click', async function() {
+                await updateBalances();
+                await displayTransactions('surface_ledger', 'surfaceTransactionList', 'surfaceLoader', 'surfaceEmpty');
+                await displayTransactions('actual_ledger', 'actualTransactionList', 'actualLoader', 'actualEmpty');
+                await displayTransactions('deposits', 'depositTransactionList', 'depositLoader', 'depositEmpty');
+                showNotification('数据已刷新');
+            });
+            
+            // 导出数据
+            document.getElementById('exportData').addEventListener('click', exportData);
+            
+            // 导入数据
+            document.getElementById('importData').addEventListener('click', function() {
+                document.getElementById('importFile').click();
+            });
+            
+            document.getElementById('importFile').addEventListener('change', async function(e) {
+                const file = e.target.files[0];
+                if (!file) return;
+                
+                try {
+                    const transactions = await importData(file);
+                    
+                    // 批量添加交易记录
+                    for (const transaction of transactions) {
+                        await addTransaction(transaction.store, transaction.data);
+                    }
+                    
+                    // 更新显示
+                    await updateBalances();
+                    await displayTransactions('surface_ledger', 'surfaceTransactionList', 'surfaceLoader', 'surfaceEmpty');
+                    await displayTransactions('actual_ledger', 'actualTransactionList', 'actualLoader', 'actualEmpty');
+                    await displayTransactions('deposits', 'depositTransactionList', 'depositLoader', 'depositEmpty');
+                    
+                    showNotification(`成功导入 ${transactions.length} 条记录`);
+                    e.target.value = ''; // 清空文件选择
+                } catch (error) {
+                    console.error('导入数据失败:', error);
+                    showNotification('导入数据失败', true);
+                }
+            });
+            
+            // 清空数据
+            document.getElementById('clearData').addEventListener('click', async function() {
+                if (confirm('确定要清空所有数据吗？此操作不可恢复！')) {
+                    try {
+                        await clearAllData();
+                        await updateBalances();
+                        await displayTransactions('surface_ledger', 'surfaceTransactionList', 'surfaceLoader', 'surfaceEmpty');
+                        await displayTransactions('actual_ledger', 'actualTransactionList', 'actualLoader', 'actualEmpty');
+                        await displayTransactions('deposits', 'depositTransactionList', 'depositLoader', 'depositEmpty');
+                        showNotification('所有数据已清空');
+                    } catch (error) {
+                        console.error('清空数据失败:', error);
+                        showNotification('清空数据失败', true);
+                    }
+                }
+            });
+            
+            // 添加到主屏幕功能
+            let deferredPrompt;
+            const installPrompt = document.getElementById('installPrompt');
+            const installButton = document.getElementById('installButton');
+            const dismissButton = document.getElementById('dismissButton');
+            
+            window.addEventListener('beforeinstallprompt', (e) => {
+                // 阻止默认提示
+                e.preventDefault();
+                // 保存事件以便后续触发
+                deferredPrompt = e;
+                // 显示自定义提示
+                installPrompt.style.display = 'block';
+            });
+            
+            installButton.addEventListener('click', async () => {
+                if (!deferredPrompt) return;
+                
+                // 显示安装提示
+                deferredPrompt.prompt();
+                
+                // 等待用户选择
+                const { outcome } = await deferredPrompt.userChoice;
+                
+                // 根据用户选择处理
+                if (outcome === 'accepted') {
+                    console.log('用户接受了安装提示');
+                } else {
+                    console.log('用户拒绝了安装提示');
+                }
+                
+                // 清除保存的提示
+                deferredPrompt = null;
+                
+                // 隐藏自定义提示
+                installPrompt.style.display = 'none';
+            });
+            
+            dismissButton.addEventListener('click', () => {
+                installPrompt.style.display = 'none';
+            });
+        }
+        
+        // 初始化应用
+        window.addEventListener('load', async () => {
+            setupEventListeners();
+            await initApp();
+        });
+    </script>
+</body>
+</html>
